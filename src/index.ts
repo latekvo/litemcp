@@ -14,7 +14,13 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { Logger } from "./logger.js";
-import { Prompt, PromptArgument, Resource, Tool, ToolParameters } from "./types.js";
+import {
+  Prompt,
+  PromptArgument,
+  Resource,
+  Tool,
+  ToolParameters,
+} from "./types.js";
 
 export class LiteMCP {
   public logger: Logger;
@@ -59,21 +65,31 @@ export class LiteMCP {
           return {
             name: tool.name,
             description: tool.description,
-            inputSchema: tool.parameters ? zodToJsonSchema(tool.parameters) : undefined,
+            inputSchema: tool.parameters
+              ? zodToJsonSchema(tool.parameters)
+              : undefined,
           };
         }),
       };
     });
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const tool = this.#tools.find((tool) => tool.name === request.params.name);
+      const tool = this.#tools.find(
+        (tool) => tool.name === request.params.name
+      );
       if (!tool) {
-        throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${request.params.name}`);
+        throw new McpError(
+          ErrorCode.MethodNotFound,
+          `Unknown tool: ${request.params.name}`
+        );
       }
       let args: any = undefined;
       if (tool.parameters) {
         const parsed = tool.parameters.safeParse(request.params.arguments);
         if (!parsed.success) {
-          throw new McpError(ErrorCode.InvalidRequest, `Invalid ${request.params.name} arguments`);
+          throw new McpError(
+            ErrorCode.InvalidRequest,
+            `Invalid ${request.params.name} arguments`
+          );
         }
         args = parsed.data;
       }
@@ -90,6 +106,9 @@ export class LiteMCP {
         return {
           content: [{ type: "text", text: result }],
         };
+      }
+      if (Array.isArray(result.content)) {
+        return result;
       }
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -110,17 +129,26 @@ export class LiteMCP {
       };
     });
     server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-      const resource = this.#resources.find((resource) => resource.uri === request.params.uri);
+      const resource = this.#resources.find(
+        (resource) => resource.uri === request.params.uri
+      );
       if (!resource) {
-        throw new McpError(ErrorCode.MethodNotFound, `Unknown resource: ${request.params.uri}`);
+        throw new McpError(
+          ErrorCode.MethodNotFound,
+          `Unknown resource: ${request.params.uri}`
+        );
       }
       let result: Awaited<ReturnType<Resource["load"]>>;
       try {
         result = await resource.load();
       } catch (error) {
-        throw new McpError(ErrorCode.InternalError, `Error reading resource: ${error}`, {
-          uri: resource.uri,
-        });
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Error reading resource: ${error}`,
+          {
+            uri: resource.uri,
+          }
+        );
       }
       return {
         contents: [
@@ -147,15 +175,23 @@ export class LiteMCP {
       };
     });
     server.setRequestHandler(GetPromptRequestSchema, async (request) => {
-      const prompt = this.#prompts.find((prompt) => prompt.name === request.params.name);
+      const prompt = this.#prompts.find(
+        (prompt) => prompt.name === request.params.name
+      );
       if (!prompt) {
-        throw new McpError(ErrorCode.MethodNotFound, `Unknown prompt: ${request.params.name}`);
+        throw new McpError(
+          ErrorCode.MethodNotFound,
+          `Unknown prompt: ${request.params.name}`
+        );
       }
       const args = request.params.arguments;
       if (prompt.arguments) {
         for (const arg of prompt.arguments) {
           if (arg.required && !(args && arg.name in args)) {
-            throw new McpError(ErrorCode.InvalidRequest, `Missing required argument: ${arg.name}`);
+            throw new McpError(
+              ErrorCode.InvalidRequest,
+              `Missing required argument: ${arg.name}`
+            );
           }
         }
       }
@@ -163,7 +199,10 @@ export class LiteMCP {
       try {
         result = await prompt.load(args as Record<string, string | undefined>);
       } catch (error) {
-        throw new McpError(ErrorCode.InternalError, `Error loading prompt: ${error}`);
+        throw new McpError(
+          ErrorCode.InternalError,
+          `Error loading prompt: ${error}`
+        );
       }
       return {
         description: prompt.description,
@@ -209,7 +248,10 @@ export class LiteMCP {
     if (this.#prompts.length) {
       capabilities.prompts = {};
     }
-    const server = new Server({ name: this.name, version: this.version }, { capabilities });
+    const server = new Server(
+      { name: this.name, version: this.version },
+      { capabilities }
+    );
     this.logger.setServer(server);
     this.setupHandlers(server);
 
